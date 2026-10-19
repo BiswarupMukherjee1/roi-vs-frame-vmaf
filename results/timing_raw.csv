@@ -1,0 +1,45 @@
+clip,metric,cpu_s,frames
+jockey,decode only,18.645999500000002,300
+jockey,PSNR (frame),18.6643215,300
+jockey,SSIM (frame),18.882317,300
+jockey,XPSNR (frame),22.2290535,300
+jockey,VMAF (frame),44.4354275,300
+jockey,VMAF (overlay crop),19.1592375,300
+jockey,py:decode_py,0.3951509780000011,300
+jockey,py:ssim_map,14.168996598000012,300
+jockey,py:pool_mean,0.1966529149999947,300
+jockey,py:pool_pblk,1.172456531999985,300
+jockey,py:pool_roiw,0.843286164000002,300
+beauty,decode only,18.654443999999998,300
+beauty,PSNR (frame),19.010465000000003,300
+beauty,SSIM (frame),18.8093785,300
+beauty,XPSNR (frame),22.446084,300
+beauty,VMAF (frame),43.407578,300
+beauty,VMAF (overlay crop),19.4135795,300
+beauty,py:decode_py,0.38220677299994676,300
+beauty,py:ssim_map,18.248887195000044,300
+beauty,py:pool_mean,0.19653094899997825,300
+beauty,py:pool_pblk,1.2144939689999923,300
+beauty,py:pool_roiw,1.015877507000031,300
+crowdrun,decode only,19.3517015,250
+crowdrun,PSNR (frame),19.0825645,250
+crowdrun,SSIM (frame),19.318727000000003,250
+crowdrun,XPSNR (frame),22.2000145,250
+crowdrun,VMAF (frame),41.355392499999994,250
+crowdrun,VMAF (overlay crop),19.680569999999996,250
+crowdrun,py:decode_py,0.34077873400001124,250
+crowdrun,py:ssim_map,14.508370994000053,250
+crowdrun,py:pool_mean,0.16221554699995266,250
+crowdrun,py:pool_pblk,1.0280499959999219,250
+crowdrun,py:pool_roiw,0.7820723480001277,250
+touchdown,decode only,9.5103275,150
+touchdown,PSNR (frame),9.518903,150
+touchdown,SSIM (frame),9.6530115,150
+touchdown,XPSNR (frame),11.568320499999999,150
+touchdown,VMAF (frame),22.982122500000003,150
+touchdown,VMAF (overlay crop),9.826761000000001,150
+touchdown,py:decode_py,0.17652172999992644,150
+touchdown,py:ssim_map,6.6803737620000305,150
+touchdown,py:pool_mean,0.09478350999999918,150
+touchdown,py:pool_pblk,0.551099587000003,150
+touchdown,py:pool_roiw,0.4343588450000766,150

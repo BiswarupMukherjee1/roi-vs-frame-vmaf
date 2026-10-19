@@ -1,0 +1,16 @@
+{
+ "clip":"jockey",
+ "frame":120,
+ "kbps":1300,
+ "tag_base":"x265-base-1300k-r0",
+ "tag_roi":"x265-roi-q20-1300k-r0",
+ "vmaf_base":89.246758,
+ "vmaf_roi":89.30013,
+ "ov_psnr_base":35.0346755981,
+ "ov_psnr_roi":41.6725845337,
+ "ov_vmaf_base":92.923761,
+ "ov_vmaf_roi":100.0,
+ "ocr_base":"MKD 2-1 RNS\n2ND HALF 38:14.0",
+ "ocr_roi":"MKD 2-1 RNS\n2ND HALF 38:14.0",
+ "truth":"MKD  2 - 1  RNS  2ND HALF  38:14.0"
+}

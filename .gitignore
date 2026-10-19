@@ -1,0 +1,8 @@
+# large, regenerable data (references, bitstreams, downloads, builds): rm -rf store/ to free it
+store/
+logs/
+__pycache__/
+*.pyc
+results/frames/
+results/ocr_ref/
+

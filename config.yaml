@@ -1,0 +1,106 @@
+# "Hidden in the average" — single source of truth for the whole experiment.
+# Run everything with:  ./run.sh            (nohup, logs in logs/)
+# Paths are relative to this file.
+
+paths:
+  store: store          # every large file (deletable: rm -rf store/)
+  results: results      # small outputs: csv, tables, figures, report
+  logs: logs
+
+storage:                # size of the WHOLE project folder
+  soft_gb: 3.0          # warn
+  hard_gb: 5.0          # abort the stage
+
+compute:
+  jobs: 3               # parallel encodes / metric runs
+  threads_per_job: 6    # libvmaf n_threads, x265 pools, svt lp
+
+# ---------------------------------------------------------------- content
+# Every clip: 1920x1080, 4:2:0 8-bit, about 5 s. UVG 120 fps is reduced to 60 fps (every other frame).
+clips:
+  jockey:
+    kind: uvg7z
+    url: https://ultravideo.fi/video/Jockey_1920x1080_120fps_420_8bit_YUV_RAW.7z
+    src_fps: 120
+    out_fps: 60
+    frames: 300
+    note: horse racing, fast pan (sport / motion)
+  beauty:
+    kind: uvg7z
+    url: https://ultravideo.fi/video/Beauty_1920x1080_120fps_420_8bit_YUV_RAW.7z
+    src_fps: 120
+    out_fps: 60
+    frames: 300
+    note: face close-up, hair in motion (face)
+  crowdrun:
+    kind: y4m_stream
+    url: https://media.xiph.org/video/derf/y4m/crowd_run_1080p50.y4m
+    src_fps: 50
+    out_fps: 50
+    frames: 250
+    note: marathon crowd, dense texture (crowd)
+  touchdown:
+    kind: y4m_stream
+    url: https://media.xiph.org/video/derf/y4m/touchdown_pass_1080p.y4m
+    src_fps: 30000/1001
+    out_fps: 30000/1001
+    frames: 150
+    note: American football broadcast shot, 4:2:2 source (sport)
+
+keep_downloads: false   # UVG .7z archives are removed once the reference is written
+
+# ---------------------------------------------------------------- overlay
+# Synthetic broadcast scoreboard (drawtext). Geometry is 16-aligned so the ROI map and the crop match codec blocks.
+overlay:
+  x: 64
+  y: 48
+  w: 640
+  h: 96
+  opacity: 0.70
+  row1: "MKD  2 - 1  RNS"
+  clock_prefix: "2ND HALF  38:"
+  clock_start_s: 12      # clock shows 38:12.0 at frame 0 and runs in tenths
+
+# ---------------------------------------------------------------- faces
+faces:
+  model_url: https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+  score_threshold: 0.7
+  min_size: 32           # px, smaller detections ignored
+  pad: 0.20              # box padding (fraction of size)
+  static_presence: 0.30  # a pixel joins the static face ROI if it is in a face box in >= 30 % of frames
+  max_area_frac: 0.40    # cap on static face ROI area (Beauty is a close-up: ~30 %)
+
+# ---------------------------------------------------------------- encoding
+encode:
+  keyint_s: 2.0
+  x265:
+    preset: medium
+    two_pass: true
+  svtav1:
+    preset: 6
+  pilot_crf_x265: [24, 29, 34, 39]       # probe to pick per-clip ladders
+  ladder_vmaf_targets: [70, 80, 88, 94]  # x265 frame-VMAF the 4 rate points should land near
+  # Fixed per-clip ladders (kbps). Filled in from the pilot (results/pilot.json); delete a line to re-derive it.
+  ladders:
+    jockey: [1300, 1800, 2500, 3400]
+    beauty: [890, 1500, 2700, 4200]
+    crowdrun: [7900, 12000, 20000, 29000]
+    touchdown: [890, 1600, 3800, 9300]
+  roi:
+    qoffsets: [-0.1, -0.2, -0.3]   # addroi qoffset; x265 QP offset = qoffset * 51
+  repeats: 3                       # repeat encodes (noise floor), at ladder point 2
+  svtapp:                          # extension: SvtAv1EncApp --roi-map-file (static vs per-frame map), CRF
+    crfs: [27, 35, 43, 51]
+    qindex_offsets: [-24, -48]     # AV1 qindex; -48 is roughly x265 dQP -10 in step size
+
+# ---------------------------------------------------------------- metrics
+metrics:
+  vmaf_model: vmaf_v0.6.1
+  block: 64              # block size for block-SSIM pooling
+  percentile: 5          # p-th percentile of block SSIM
+  roi_weight: 0.5        # ROI-weighted SSIM = w*SSIM(ROI) + (1-w)*SSIM(background)
+  ocr_every: 1           # OCR every frame (clock digits change every 0.1 s; misreads cluster on those frames)
+  hidden:                # "hidden damage" = frame looks fine, region does not
+    frame_vmaf_min: 80
+    region_gap: 15       # frame VMAF - overlay VMAF >= this
+  timing_reps: 2
