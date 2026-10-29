@@ -1,23 +1,36 @@
 # Frame vs ROI video quality: scoreboard and face degradation in x265 and SVT-AV1
 
-*Hidden in the average*: do frame-level quality metrics miss what happens to the small regions viewers
-care about most, such as the scoreboard and faces in sports broadcasts? And can a cheap
-region-of-interest (ROI) map both measure that and fix it inside the encoder at the same bitrate?
+PSNR, SSIM and VMAF average a whole picture into one number. In a sports broadcast, though, the parts
+viewers actually read are small: the scoreboard here covers about 3 % of a 1080p frame, and a face in
+a wide shot even less. I wanted to check whether frame-level metrics notice when an encoder, or a
+tuning choice, changes those regions, and whether a simple region-of-interest (ROI) map can help,
+both to measure the region and to give it more bits at the same bitrate.
 
-A reproducible study: 4 clips, 2 encoders, 176 encodes, 44 000 measured frames, run with one command
-(`./run.sh`) from one file (`config.yaml`). Every number below comes from
-[`results/REPORT.md`](results/REPORT.md).
+To test this, I took four 5-second 1080p clips (horse racing, a face close-up, a marathon crowd and
+American football), burned a semi-transparent scoreboard with a running clock into each, and encoded
+them with x265 and SVT-AV1 at four bitrates. I measured quality on the whole frame and on the
+scoreboard and face regions separately, checked with OCR whether the scoreboard stayed readable, and
+tried ROI encoding in x265 through FFmpeg's `addroi` filter at three strengths. In total: 176 encodes
+and 44 000 measured frames, run with one command (`./run.sh`) from one file (`config.yaml`).
 
-**TL;DR**
+**Observations:**
 
-* **Frame metrics cannot see region differences.** Two encodes can share the same frame VMAF while
-  their scoreboards differ by up to 6.6 dB in PSNR. The SVT-AV1 vs x265 BD-rate moves from −30 % to −47 % depending
-  on whether you measure the frame or the scoreboard, and on one clip its sign flips with the pooling.
-* **Local pooling alone does not help.** At equal bitrate, every ROI-blind score, including
-  5th-percentile block SSIM, calls the encode with the better scoreboard *worse* in 72–100 % of pairs. ROI-aware pooling
-  gets it right in 87 % of cases for about 3 ms per frame.
-* **A cheap ROI map fixes it.** x265 `addroi` at ΔQP −10 adds +2.7 to +5.0 dB on the scoreboard at the
-  same bitrate for ≤ 1.8 % frame-VMAF BD-rate. Moving faces need a per-frame map, tested with SVT-AV1.
+* The frame score barely registers region differences. Two x265 encodes at the same bitrate score
+  89.2 and 89.3 in frame VMAF while their scoreboards differ by 6.7 dB in PSNR. SVT-AV1's BD-rate
+  against x265 on Jockey is −30 % by frame VMAF and −47 % by scoreboard PSNR. Frame SSIM also gives
+  −47 % on that clip, though, so the choice of metric matters about as much as the region.
+* Scores that ignore the ROI, including a "local" 5th-percentile block SSIM, do not register the
+  scoreboard gain from ROI encoding. ROI-weighted pooling does, which is expected since it weights
+  the region; the frame metrics, for their part, correctly see a slightly worse background. Which of
+  the two matches viewers better would need a subjective test, which I did not run. Measuring the
+  region directly is cheap: VMAF on the scoreboard costs 1.9 ms per frame against 86.6 ms for frame
+  VMAF.
+* With the ROI limited to the scoreboard, a static map at ΔQP −10 raises scoreboard PSNR by 2.7 to
+  5.0 dB at the same bitrate, for at most 1.8 % frame-VMAF BD-rate. It costs much more when the ROI is
+  large (+15.6 % on the close-up), and a static map cannot follow moving faces. A per-frame map with
+  SVT-AV1 helps faces on Jockey and CrowdRun, but results are mixed on the close-up.
+
+All numbers come from [`results/REPORT.md`](results/REPORT.md), which the pipeline generates.
 
 ![Same bitrate, same frame VMAF, different scoreboard](results/figures/fig2_damage_frame.png)
 *Same frame, same bitrate, frame VMAF 89.2 vs 89.3: x265 without (middle) and with (bottom) an ROI map.*
@@ -27,10 +40,9 @@ A reproducible study: 4 clips, 2 encoders, 176 encodes, 44 000 measured frames, 
 ## The problem
 
 Encoders are tuned and compared with frame-level metrics: PSNR, SSIM, VMAF. Each one averages a
-whole picture into one number. In live sport, though, what viewers look at is often small: a
-scoreboard covers about 3 % of the frame and a face in a wide shot even less. A codec, or a tuning
-choice, can change those regions a lot while the frame average barely moves. If that happens, two
-things go wrong:
+whole picture into one number. In live sport, what viewers look at is often small, so a codec or a
+tuning choice can change those regions a lot while the frame average barely moves. If that happens,
+two things go wrong:
 
 * **Measurement.** Quality monitoring and codec comparisons (BD-rate) report a number that does not
   describe the regions that matter.
@@ -55,13 +67,13 @@ broadcaster knows where its own graphics are, and a light face detector runs in 
 3. **Measuring three ways.**
    * *Frame*: VMAF, PSNR-Y, SSIM, XPSNR.
    * *Region*: VMAF, PSNR and SSIM on the scoreboard crop and on face boxes from OpenCV's YuNet detector,
-     plus **OCR** of the scoreboard on every frame, scored against the known text. OCR is a
+     plus OCR of the scoreboard on every frame, scored against the known text. OCR is a
      "can you still read it" check that no codec is tuned for.
    * *Pooling*: one SSIM map per frame, pooled as the mean, the 5th percentile of 64×64 blocks (a
      "local-aware" pooling), and ROI-weighted (50 % ROI, 50 % background). The compute cost of each
      is timed.
-4. **Fixing it.** The ROI map (scoreboard box plus faces) is fed to x265 through FFmpeg's `addroi`
-   filter as a negative QP offset, so the region gets more bits at the **same 2-pass bitrate target**.
+4. **ROI encoding.** The ROI map (scoreboard box plus faces) is fed to x265 through FFmpeg's `addroi`
+   filter as a negative QP offset, so the region gets more bits at the same 2-pass bitrate target.
    Three strengths are swept: ΔQP −5, −10, −15.
 5. **Extension: moving faces.** `addroi` is static for a whole clip, so it cannot follow faces. A
    per-frame map is tested with SVT-AV1's own encoder app (`--roi-map-file`), against a static map.
@@ -69,29 +81,29 @@ broadcaster knows where its own graphics are, and a light face detector runs in 
    bitrate). BD-rates use measured bitrates and report how much the curves overlap. The metric code is
    cross-checked against libvmaf (region PSNR matches to 0.0000 dB).
 
-Altogether: 176 encodes and 44 000 measured frames. Design choices and the pitfalls found on the way
-are in [`DESIGN.md`](DESIGN.md).
+Design choices and the pitfalls found on the way are in [`DESIGN.md`](DESIGN.md).
 
 ---
 
 ## Results
 
-### 1. The frame score cannot tell apart encodes whose scoreboards differ a lot, and the codec comparison changes with where you look
+### 1. The frame score barely tells apart encodes whose scoreboards differ, and the codec comparison depends on what you measure
 
-* At the **same frame VMAF**, SVT-AV1's scoreboard is +4.3 dB (Beauty), +1.8 dB (Jockey), +1.0 dB
+* At the same frame VMAF, SVT-AV1's scoreboard is +4.3 dB (Beauty), +1.8 dB (Jockey), +1.0 dB
   (CrowdRun) and +0.5 dB (TouchdownPass) cleaner than x265's in PSNR, while frame PSNR differs by less
   than 0.6 dB.
 * Within one codec it is starker. In Figure 2, x265 with and without an ROI map scores frame VMAF 89.2
   vs 89.3, but the scoreboard is 35.0 vs 41.7 dB.
-* **BD-rate of SVT-AV1 vs x265** on Jockey is −30 % by frame VMAF and −47 % by scoreboard PSNR
-  (TouchdownPass: −34 % vs −45 %). On CrowdRun it is −7 % by frame PSNR, −20 % by frame VMAF and
-  **+10 %** by 5th-percentile block SSIM, so even the sign depends on the pooling.
-* What I did **not** find is outright collapse. Scoreboard VMAF was at or above frame VMAF in all 32
+* BD-rate of SVT-AV1 vs x265 on Jockey is −30 % by frame VMAF and −47 % by scoreboard PSNR
+  (TouchdownPass: −34 % vs −45 %). Frame SSIM gives −47 % on Jockey too, so part of this spread comes
+  from the metric rather than the region. On CrowdRun it is −7 % by frame PSNR, −20 % by frame VMAF and
+  +10 % by 5th-percentile block SSIM, so even the sign depends on the pooling.
+* What I did not find is outright collapse. Scoreboard VMAF was at or above frame VMAF in all 32
   baseline encodes. OCR misread the scoreboard (on a frame the uncompressed video reads correctly) in at
   most 1.5 % of the frames with frame VMAF ≥ 80. Static, high-contrast text is cheap to code. The damage
   is real, but it shows up as *differences between encodes*, not as unreadable graphics.
 
-### 2. At equal bitrate, every ROI-blind score ranks the encodes the wrong way, including the "local" one
+### 2. Which scores register the scoreboard change at equal bitrate
 
 x265 encodes with and without an ROI map were paired at the same 2-pass target, 48 pairs in all. The
 scoreboard improves in 47 of them (+0.2 to +6.7 dB), paid for by a slightly worse background. On those
@@ -99,28 +111,34 @@ scoreboard improves in 47 of them (+0.2 to +6.7 dB), paid for by a slightly wors
 
 | metric | frame VMAF | frame PSNR | XPSNR | SSIM mean | SSIM 5th-pct block | SSIM ROI-weighted |
 |:--|--:|--:|--:|--:|--:|--:|
-| agrees with the scoreboard gain | 28 % | 6 % | 11 % | 2 % | **0 %** | **87 %** |
+| agrees with the scoreboard gain | 28 % | 6 % | 11 % | 2 % | 0 % | 87 % |
 | rank correlation with scoreboard PSNR, same bitrate | −0.68 | −0.81 | −0.79 | −0.84 | −0.85 | +0.53 |
 
 Pooling that is local but knows nothing about content finds the worst *texture* blocks (crowd, grass,
-hair), not the graphic. Pooling that knows the ROI sees it, for about 3 ms per frame on top of the SSIM
-map, and VMAF on the scoreboard alone costs 1.9 ms against 87 ms for frame VMAF (compute-cost table
+hair), not the graphic. ROI-weighted pooling sees the scoreboard gain, but that is partly by
+construction, since it gives the region half the weight. The frame metrics are not simply wrong here:
+they correctly see the background getting slightly worse. Which trade-off viewers prefer is a question
+for a subjective test. On cost, ROI-weighted pooling adds about 3 ms per frame on top of the SSIM map,
+and VMAF on the scoreboard alone costs 1.9 ms against 86.6 ms for frame VMAF (compute-cost table
 below).
 
-### 3. A cheap ROI map fixes the scoreboard almost for free when the region is small, but a static map cannot follow faces
+### 3. A static ROI map improves the scoreboard at small cost when the region is small, but cannot follow faces
 
 * On the three clips where the ROI is just the scoreboard (3 % of the frame), ΔQP −10 raises scoreboard
-  PSNR by **+2.7 to +5.0 dB at the same bitrate** (rate error ≤ 1.1 %). Frame VMAF moves by −0.9 to
-  +0.8.
-* In BD-rate terms, the scoreboard needs **50–72 % fewer bits** for a frame-VMAF cost of +0.4 to +1.8 %.
-  ΔQP −5 is free (frame-VMAF BD-rate −1.7 % to 0.0 %) and still saves 31–50 % on the scoreboard.
+  PSNR by +2.7 to +5.0 dB at the same bitrate (rate error ≤ 1.1 %). Frame VMAF moves by −0.9 to +0.8.
+* In BD-rate terms, the scoreboard needs 50–72 % fewer bits for a frame-VMAF cost of +0.4 to +1.8 %.
+  ΔQP −5 costs nothing on frame VMAF (BD-rate −1.7 % to 0.0 %) and still saves 31–50 % on the
+  scoreboard.
 * At the lowest bitrate it restores legibility: Jockey OCR exact-read goes from 91 % to 99 %
   (uncompressed: 98 %), and TouchdownPass from 89 % to 93 % (= uncompressed).
-* **Limits.** On the close-up (Beauty, ROI = 39 % of the frame) the same ΔQP costs +15.6 % frame-VMAF
+* Limits. On the close-up (Beauty, ROI = 39 % of the frame) the same ΔQP costs +15.6 % frame-VMAF
   BD-rate. Moving faces never enter a static map, so they *lose* bits: face PSNR BD-rate +7 % on Jockey
-  and +8 % on TouchdownPass. A **per-frame map** (SVT-AV1 extension) fixes that: face PSNR BD-rate −5 to
-  −8 % on Jockey and −10 to −12 % on CrowdRun, against +0.5 to +2.3 % for the static map, for at most
-  1.1 % frame-VMAF cost.
+  and +8 % on TouchdownPass.
+* A per-frame map (SVT-AV1 extension) helps there: face PSNR BD-rate −5 to −8 % on Jockey and −10 to
+  −12 % on CrowdRun, against +0.5 to +2.3 % for the static map, for at most 1.1 % frame-VMAF cost. On
+  TouchdownPass the gain is small (−1 to −3 %), since faces are rare under helmets. On Beauty it is
+  mixed: −6.6 % at qindex offset −24, but +4.9 % at −48, where the face covers so much of the frame
+  that the stronger offset no longer helps.
 
 One observation that does not fit the averages (one clip, single SVT-AV1 run, so treat it as a lead):
 at the lowest TouchdownPass bitrate, SVT-AV1 beats x265 on frame VMAF (70.9 vs 68.7) *and* on
@@ -174,7 +192,7 @@ CPU time (user + sys) on one thread, per 1080p frame, net of decoding, mean of t
 | frame VMAF (libvmaf v0.6.1) | 86.6 |
 | frame XPSNR (FFmpeg) | 12.4 |
 | frame SSIM, frame PSNR (FFmpeg, SIMD) | < 1 (below the ±1 ms run-to-run noise) |
-| **scoreboard VMAF** (640×96 crop) | **1.9** |
+| scoreboard VMAF (640×96 crop) | 1.9 |
 | full-resolution SSIM map (Python / OpenCV, unoptimised) | 52.7 |
 | + mean pooling | 0.7 |
 | + ROI-weighted pooling | 3.1 |
@@ -221,7 +239,7 @@ touchdown_pass). They are not redistributed here; see their sites for terms of u
 ```
 config.yaml   every parameter: clips, overlay, bitrate ladders, ROI strengths, metric settings
 run.sh        one command
-hia/          the pipeline, one module per stage (+ bdrate.py, common.py)
+hia/          the pipeline ("hidden in the average"), one module per stage (+ bdrate.py, common.py)
 tests/        sanity tests
 results/      small outputs: REPORT.md, encodes.csv, tables/, figures/, roi/, pilot.json
 store/        large and regenerable (git-ignored): refs/, bitstreams/, models/, build/
