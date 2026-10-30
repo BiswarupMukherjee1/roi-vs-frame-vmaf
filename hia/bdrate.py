@@ -1,7 +1,7 @@
 """Bjontegaard delta rate / delta quality.
 
-Default interpolation is PCHIP on log-rate (as in AOM CTC / libaom tools), which avoids the
-overshoot of the original cubic polynomial fit. The cubic fit is kept for comparison.
+Default interpolation is PCHIP on log-rate, which avoids the overshoot of the original cubic
+polynomial fit. The cubic fit is kept for comparison.
 """
 from __future__ import annotations
 
