@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-# keep every cache inside the project (matplotlib would otherwise write to $XDG_CACHE_HOME or ~)
+# keeping every cache inside the project (matplotlib would otherwise write to $XDG_CACHE_HOME or ~)
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / "store" / "cache" / "matplotlib"))
 log = logging.getLogger("hia")
 
@@ -42,7 +42,7 @@ class Cfg:
     def clips(self) -> dict:
         return self.raw["clips"]
 
-    # directory layout -------------------------------------------------------
+    # directory layout
     def d(self, *parts) -> Path:
         out = self.store.joinpath(*parts)
         out.mkdir(parents=True, exist_ok=True)
