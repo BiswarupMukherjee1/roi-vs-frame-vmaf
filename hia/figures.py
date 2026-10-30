@@ -14,7 +14,7 @@ import pandas as pd  # noqa: E402
 from .common import Cfg, log, read_json  # noqa: E402
 from .metrics import ssim_map  # noqa: E402
 
-# reference palette (dataviz skill, light mode): categorical slots 1-3, ordinal blue ramp, text inks
+# plot colours
 SURF, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 SERIES = {"x265": "#2a78d6", "svtav1": "#eb6834", "roi": "#1baf7a"}
 LABEL = {"x265": "x265", "svtav1": "SVT-AV1", "roi": "x265 + ROI map"}
@@ -46,7 +46,7 @@ def roi_q(cfg):
     return cfg["encode"]["roi"]["qoffsets"][1]
 
 
-# ------------------------------------------------------------------ fig 1: RD curves, global vs region
+# fig 1: RD curves, global vs region
 def fig_rd(cfg, s, out):
     clips = [c for c in cfg.clips if c in set(s["clip"])]
     rows = [("vmaf", "frame VMAF"), ("ov_psnr", "scoreboard PSNR-Y (dB)"), ("ocr_exact", "scoreboard read\nexactly (OCR, %)")]
@@ -94,7 +94,7 @@ def fig_rd(cfg, s, out):
     plt.close(fig)
 
 
-# ------------------------------------------------------------------ fig 2: the damage frame
+# fig 2: the damage frame
 def pick_damage_frame(cfg, fr):
     """A frame where x265 baseline and x265+ROI (same target bitrate) have ~equal frame VMAF
     (>= threshold) but the scoreboard differs most. Small-ROI clips only (the close-up is a different case)."""
@@ -164,7 +164,7 @@ def fig_damage(cfg, fr, s, out):
                 ocr_base=str(r.ocr_text_b), ocr_roi=str(r.ocr_text_r), truth="  ".join(meta["truth"][n]))
 
 
-# ------------------------------------------------------------------ fig 3: ROI trade-off
+# fig 3: ROI trade-off
 def fig_roi(cfg, roi_t, out):
     clips = [c for c in cfg.clips if c in set(roi_t["clip"])]
     qs = sorted(roi_t.qoffset.unique(), reverse=True)
@@ -191,7 +191,7 @@ def fig_roi(cfg, roi_t, out):
     plt.close(fig)
 
 
-# ------------------------------------------------------------------ fig 4: ROI maps (setup sanity)
+#  fig 0: ROI maps
 def fig_maps(cfg, out):
     clips = list(cfg.clips)
     fig, axs = plt.subplots(1, len(clips), figsize=(3.6 * len(clips), 2.4), squeeze=False)
