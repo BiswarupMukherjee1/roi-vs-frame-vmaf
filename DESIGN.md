@@ -1,7 +1,7 @@
-# Design notes
+# Design document
 
-Why the experiment is set up the way it is, what was verified about the tools before relying on
-them, and the pitfalls found while building. The results are in [README.md](README.md) and
+This document explains why the experiment was set up this way and, what was verified about the tools before relying on
+them, and the problems encountered while building it. The results are in [README.md](README.md) and
 [results/REPORT.md](results/REPORT.md).
 
 ## 1. Design choices
@@ -28,9 +28,9 @@ them, and the pitfalls found while building. The results are in [README.md](READ
    and ROI only. Each is tested on whether it sees a known region improvement at equal bitrate, and
    its compute cost is timed. XPSNR (in FFmpeg, activity-weighted) is a cheap perceptual baseline.
 6. **Fair rate matching for ROI encoding.** x265 baseline and ROI encodes both use 2-pass ABR at the
-   same target, so "same bitrate" holds (rate error ≤ 1.1 % on small-ROI clips). BD-rates always use
+   same target, so "same bitrate" holds (rate error ≤ 1.1 % at ΔQP -10 and ≤ 2.2 % at all strengths). BD-rates always use
    measured bitrates.
-7. **An ROI strength sweep, not one value.** qoffset ∈ {−0.1, −0.2, −0.3} (ΔQP ≈ −5, −10, −15) shows the
+7. **An ROI strength sweep, not one value.** qoffset ∈ {-0.1, -0.2, -0.3} (ΔQP ≈ -5, -10, -15) shows the
    trade-off curve rather than one hand-picked point.
 8. **Per-clip rate ladders.** One ladder for all clips would put Beauty at VMAF 97 everywhere and
    CrowdRun at VMAF 40. An x265 CRF pilot picks 4 targets per clip aimed at frame VMAF 70/80/88/94.
@@ -42,13 +42,15 @@ them, and the pitfalls found while building. The results are in [README.md](READ
 
 * FFmpeg 7.1.5 ships `libvmaf`, `addroi`, `xpsnr`, `drawtext`, `libx265` and `libsvtav1`
   (SVT-AV1 3.1.2); OpenCV 4.10 runs YuNet through `cv2.FaceDetectorYN` (no onnxruntime needed).
-* FFmpeg's libx265 wrapper turns ROI side data into per-block QP offsets: `ΔQP = qoffset × 51` on
-  16×16 blocks. It needs AQ enabled (x265's default `aq-mode=2`).
+* FFmpeg's libx265 wrapper turns ROI side data into x265's `quantOffsets` array: `ΔQP = qoffset × 51`
+  per 16×16 block. x265 adds these to its adaptive-quantisation offsets in the lookahead, so AQ must
+  be on (x265's default `aq-mode=2`; with `aq-mode=0` FFmpeg prints a warning and skips the ROI). The
+  same offsets are applied in pass 1 and pass 2, since x265 does not define what happens if they differ.
 * `addroi` regions are static for a whole clip (its expressions only see `iw`, `ih`), so x265 gets one
   map per clip: the overlay box plus the face pixels present in ≥ 30 % of frames.
 * **FFmpeg's libsvtav1 wrapper ignores ROI side data**, and `roi-map-file` is rejected by
   `-svtav1-params` because it is an `SvtAv1EncApp`-only option. The per-frame map extension therefore
-  builds `SvtAv1EncApp` from the same 3.1.2 source. Its map gives qindex offsets (−255..255) per
+  builds `SvtAv1EncApp` from the same 3.1.2 source. Its map gives qindex offsets (-255..255) per
   64×64 superblock, up to 8 distinct values per frame, applied through AV1 segmentation.
 * **SVT-AV1 VBR is not bit-exact between identical runs**; x265 is.
 
@@ -71,10 +73,7 @@ them, and the pitfalls found while building. The results are in [README.md](READ
   cap is now 40 %, and an oversized single face is shrunk around its centre instead of dropped.
 * **SVT-AV1 ROI under VBR.** `--roi-map-file` raised region quality under CRF but not under VBR, where
   frame-level rate control compensates. The extension therefore runs CRF and is compared by BD-rate.
-* **pandas `.clip`.** `df.clip` and `row.clip` are pandas methods, not the `clip` column; all access
-  uses `["clip"]`.
-* **Detached runs.** `nohup` alone did not survive the end of the controlling session, so `run.sh` uses
-  `setsid nohup`. The timing stage checkpoints per clip.
+
 
 ## 4. What the hypothesis turned into
 
@@ -82,6 +81,6 @@ The starting hypothesis was "frame VMAF stays high while the scoreboard is damag
 sense that was rare: an OCR misread on a frame with frame VMAF ≥ 80 happened in at most 1.5 % of such
 frames, and scoreboard VMAF was never below frame VMAF. What the frame score does hide is
 **differences** between encodes and codecs in the regions that matter: up to +4.3 dB of scoreboard
-PSNR at equal frame VMAF, codec BD-rates that move from −30 % to −47 % (or change sign) with the region
+PSNR at equal frame VMAF, codec BD-rates that move from -30 % to -47 % (or change sign) with the region
 or pooling, and frame metrics that rank equal-rate encodes in the opposite order to their scoreboard
 quality. The README findings are written around that.
