@@ -1,21 +1,17 @@
-# "Hidden in the average" — single source of truth for the whole experiment.
-# Run everything with:  ./run.sh            (nohup, logs in logs/)
-# Paths are relative to this file.
+# All parameters of the experiment (the term "hia" means "hidden in the average").
+# the experiments can be run with:  ./run.sh
 
 paths:
-  store: store          # every large file (deletable: rm -rf store/)
+  store: store          # large files
   results: results      # small outputs: csv, tables, figures, report
   logs: logs
 
-storage:                # size of the WHOLE project folder
-  soft_gb: 3.0          # warn
-  hard_gb: 5.0          # abort the stage
 
 compute:
   jobs: 3               # parallel encodes / metric runs
   threads_per_job: 6    # libvmaf n_threads, x265 pools, svt lp
 
-# ---------------------------------------------------------------- content
+# content
 # Every clip: 1920x1080, 4:2:0 8-bit, about 5 s. UVG 120 fps is reduced to 60 fps (every other frame).
 clips:
   jockey:
@@ -49,7 +45,7 @@ clips:
 
 keep_downloads: false   # UVG .7z archives are removed once the reference is written
 
-# ---------------------------------------------------------------- overlay
+# overlay
 # Synthetic broadcast scoreboard (drawtext). Geometry is 16-aligned so the ROI map and the crop match codec blocks.
 overlay:
   x: 64
@@ -61,7 +57,7 @@ overlay:
   clock_prefix: "2ND HALF  38:"
   clock_start_s: 12      # clock shows 38:12.0 at frame 0 and runs in tenths
 
-# ---------------------------------------------------------------- faces
+# faces
 faces:
   model_url: https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
   score_threshold: 0.7
@@ -70,7 +66,7 @@ faces:
   static_presence: 0.30  # a pixel joins the static face ROI if it is in a face box in >= 30 % of frames
   max_area_frac: 0.40    # cap on static face ROI area (Beauty is a close-up: ~30 %)
 
-# ---------------------------------------------------------------- encoding
+# encoding
 encode:
   keyint_s: 2.0
   x265:
@@ -93,13 +89,13 @@ encode:
     crfs: [27, 35, 43, 51]
     qindex_offsets: [-24, -48]     # AV1 qindex; -48 is roughly x265 dQP -10 in step size
 
-# ---------------------------------------------------------------- metrics
+# metrics
 metrics:
   vmaf_model: vmaf_v0.6.1
   block: 64              # block size for block-SSIM pooling
   percentile: 5          # p-th percentile of block SSIM
   roi_weight: 0.5        # ROI-weighted SSIM = w*SSIM(ROI) + (1-w)*SSIM(background)
-  ocr_every: 1           # OCR every frame (clock digits change every 0.1 s; misreads cluster on those frames)
+  ocr_every: 1           # OCR every frame (every 6th frame gave a biased sample, see DESIGN.md)
   hidden:                # "hidden damage" = frame looks fine, region does not
     frame_vmaf_min: 80
     region_gap: 15       # frame VMAF - overlay VMAF >= this
