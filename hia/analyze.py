@@ -75,7 +75,7 @@ def base(s):  # first-run baseline encodes
     return s[(s["mode"] == "base") & (s.rep == 0)]
 
 
-# ----------------------------------------------------------------------------- analyses
+# analyses
 def table_bdrate(cfg, s):
     """SVT-AV1 vs x265, by every metric. 'Both ways' = frame vs region metrics."""
     rows = []
@@ -191,7 +191,7 @@ def table_pooling(cfg, roi_t, s):
     """Does each frame-level/pooled metric see the overlay improvement of ROI encoding at equal rate?
 
     For every (clip, rate, strength) pair, the 'truth' direction is the sign of the overlay PSNR change
-    (all pairs improve the overlay by construction; the test is whether the metric agrees or calls the
+    (47 of 48 pairs improve the overlay; the test is whether the metric agrees or calls the
     ROI encode worse). Also Spearman rho, within clip, of each metric with overlay PSNR across all
     x265 encodes (base + ROI) at the same 4 rates.
     """
