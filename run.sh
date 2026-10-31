@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# One command for the whole experiment. Runs detached under nohup.
+
 #   ./run.sh                 all stages (prepare roi pilot encode svtroi metrics timing analyze figures)
-#   ./run.sh analyze figures only some stages (each stage skips finished work)
-#   ./run.sh --clips beauty  restrict to some clips
-# Follow progress:  tail -f logs/run_latest.log
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 mkdir -p logs store/cache
